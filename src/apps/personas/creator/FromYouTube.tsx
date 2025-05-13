@@ -1,97 +1,26 @@
 import * as React from 'react';
-
-import type { SxProps } from '@mui/joy/styles/types';
-import { Box, Button, Card, IconButton, Input, Typography } from '@mui/joy';
-import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
+import { Box, Button, Input, Typography } from '@mui/joy';
 import YouTubeIcon from '@mui/icons-material/YouTube';
-
-import { extractYoutubeVideoIDFromURL } from '~/modules/youtube/youtube.utils';
-import { useYouTubeTranscript, YTVideoTranscript } from '~/modules/youtube/useYouTubeTranscript';
-
-import { GoodTooltip } from '~/common/components/GoodTooltip';
+import { useYouTubeTranscript } from '~/modules/youtube/useYouTubeTranscript';
 import { InlineError } from '~/common/components/InlineError';
-
-import type { SimplePersonaProvenance } from '../store-app-personas';
-
-
-function YouTubeVideoTranscriptCard(props: { transcript: YTVideoTranscript, onClose: () => void, sx?: SxProps }) {
-  const { transcript } = props;
-  return (
-    <Card
-      variant='soft'
-      sx={{
-        border: '1px dashed',
-        borderColor: 'neutral.solidBg',
-        p: 1,
-        ...props.sx,
-      }}
-    >
-      <Box sx={{ position: 'relative' }}>
-        {!!transcript.thumbnailUrl && (
-          <picture style={{ lineHeight: 0 }}>
-            <img
-              src={transcript.thumbnailUrl}
-              alt='YouTube Video Thumbnail'
-              height={80}
-              style={{ float: 'left', marginRight: 8 }}
-            />
-          </picture>
-        )}
-
-        {/*<Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>*/}
-        <Typography level='title-sm'>
-          {transcript?.title}
-        </Typography>
-        <Typography level='body-xs' sx={{ mt: 0.75 }}>
-          {transcript?.transcript.slice(0, 280)}...
-        </Typography>
-        {/*</Box>*/}
-
-        <IconButton
-          size='sm'
-          onClick={props.onClose}
-          sx={{
-            position: 'absolute', top: -8, right: -8,
-            borderRadius: 'md',
-          }}>
-          <CloseRoundedIcon />
-        </IconButton>
-      </Box>
-    </Card>
-  );
-}
-
 
 export function FromYouTube(props: {
   isTransforming: boolean;
-  onCreate: (text: string, provenance: SimplePersonaProvenance) => void;
+  onCreate: (text: string, provenance: { type: string; url: string; title: string; thumbnailUrl: string }) => void;
 }) {
-
-  // state
   const [videoURL, setVideoURL] = React.useState('');
   const [videoID, setVideoID] = React.useState<string | null>(null);
+  const [usedFallback, setUsedFallback] = React.useState(false);
 
-  // external state
-
-  const { onCreate } = props;
-  const onNewTranscript = React.useCallback((transcript: YTVideoTranscript) => {
-    // setVideoID(null); // reset the video ID, to cycle the refetch
-    onCreate(
-      transcript.transcript,
-      {
-        type: 'youtube',
-        url: videoURL,
-        title: transcript.title,
-        thumbnailUrl: transcript.thumbnailUrl,
-      },
-    );
-  }, [onCreate, videoURL]);
-
-  const {
-    transcript,
-    isFetching, isError, error,
-  } = useYouTubeTranscript(videoID, onNewTranscript);
-
+  const { transcript, isFetching, isError, error } = useYouTubeTranscript(videoID, (data) => {
+    setUsedFallback(!data.transcript); // Check if fallback was used
+    props.onCreate(data.transcript, {
+      type: 'youtube',
+      url: videoURL,
+      title: data.title,
+      thumbnailUrl: data.thumbnailUrl,
+    });
+  });
 
   const handleVideoURLChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setVideoID(null);
@@ -99,61 +28,53 @@ export function FromYouTube(props: {
   };
 
   const handleCreateFromTranscript = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault(); // stop the form submit
-
-    const videoId = extractYoutubeVideoIDFromURL(videoURL) || null;
-    if (!videoId)
-      setVideoURL('Invalid');
-
-    // kick-start the transcript fetch
-    setVideoID(videoId);
+    e.preventDefault();
+    const videoId = new URL(videoURL).searchParams.get('v');
+    if (videoId) {
+      setVideoID(videoId);
+    } else {
+      setVideoURL('Invalid URL');
+    }
   };
 
+  return (
+    <Box>
+      <Typography level="title-md" startDecorator={<YouTubeIcon sx={{ color: '#f00' }} />} sx={{ mb: 3 }}>
+        YouTube -&gt; Persona
+      </Typography>
 
-  return <>
-
-    <Typography level='title-md' startDecorator={<YouTubeIcon sx={{ color: '#f00' }} />} sx={{ mb: 3 }}>
-      YouTube -&gt; Persona
-    </Typography>
-
-    <form onSubmit={handleCreateFromTranscript}>
-      <Input
-        required
-        type='url'
-        fullWidth
-        disabled={isFetching || props.isTransforming}
-        variant='outlined'
-        placeholder='YouTube Video URL'
-        value={videoURL}
-        onChange={handleVideoURLChange}
-        sx={{ mb: 1.5, backgroundColor: 'background.popup' }}
-      />
-
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <form onSubmit={handleCreateFromTranscript}>
+        <Input
+          required
+          type="url"
+          fullWidth
+          disabled={isFetching || props.isTransforming}
+          variant="outlined"
+          placeholder="YouTube Video URL"
+          value={videoURL}
+          onChange={handleVideoURLChange}
+          sx={{ mb: 1.5 }}
+        />
         <Button
-          type='submit' variant='solid'
+          type="submit"
+          variant="solid"
           disabled={isFetching || props.isTransforming || !videoURL}
           loading={isFetching}
           sx={{ minWidth: 140 }}
         >
           Create
         </Button>
+      </form>
 
-        <GoodTooltip title='This example comes from the popular Fireship YouTube channel, which presents technical topics with irreverent humor.'>
-          <Button variant='outlined' color='neutral' onClick={() => setVideoURL('https://www.youtube.com/watch?v=M_wZpSEvOkc')}>
-            Example
-          </Button>
-        </GoodTooltip>
-      </Box>
-    </form>
+      {isError && <InlineError error={error} sx={{ mt: 3 }} />}
 
-    {isError && (
-      <InlineError error={error} sx={{ mt: 3 }} />
-    )}
-
-    {!!transcript && !!videoID && (
-      <YouTubeVideoTranscriptCard transcript={transcript} onClose={() => setVideoID(null)} sx={{ mt: 3 }} />
-    )}
-
-  </>;
+      {transcript && (
+        <Typography level="body-xs" sx={{ mt: 3 }}>
+          {usedFallback
+            ? 'Using auto-generated captions as fallback.'
+            : 'Using standard captions provided by the video.'}
+        </Typography>
+      )}
+    </Box>
+  );
 }
