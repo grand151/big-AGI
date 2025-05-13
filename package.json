@@ -3,7 +3,7 @@
   "version": "1.92.0",
   "private": true,
   "author": "Enrico Ros <enrico.ros@gmail.com>",
-  "repository": "https://github.com/enricoros/big-agi",
+  "repository": "https://github.com/grand151/big-agi",
   "scripts": {
     "dev": "next dev --turbopack",
     "dev-debug": "cross-env NODE_OPTIONS='--inspect' next dev",
