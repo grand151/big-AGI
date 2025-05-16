@@ -105,7 +105,7 @@ let nextConfig: NextConfig = {
 };
 
 // Validate environment variables, if set at build time. Will be actually read and used at runtime.
-import { verifyBuildTimeVars } from '~/server/env';
+import { verifyBuildTimeVars } from './src/server/env';
 verifyBuildTimeVars();
 
 // conditionally enable the nextjs bundle analyzer
