@@ -36,7 +36,7 @@ import { glueForMessageTokens, marshallWrapDocFragments } from '~/common/stores/
 import { isValidConversation, useChatStore } from '~/common/stores/chat/store-chats';
 import { getModelParameterValueOrThrow } from '~/common/stores/llms/llms.parameters';
 import { launchAppCall, removeQueryParam, useRouterQuery } from '~/common/app.routes';
-import { lineHeightTextareaMd } from '~/common/app.theme';
+import { lineHeightTextareaMd, themeBgAppChatComposer } from '~/common/app.theme';
 import { optimaOpenPreferences } from '~/common/layout/optima/useOptima';
 import { platformAwareKeystrokes } from '~/common/components/KeyStroke';
 import { supportsScreenCapture } from '~/common/util/screenCaptureUtils';
@@ -144,6 +144,7 @@ export function Composer(props: {
   const { novel: explainCtrlEnter, touch: touchCtrlEnter } = useUICounter('composer-ctrl-enter');
   const [startupText, setStartupText] = useComposerStartupText();
   const enterIsNewline = useUIPreferencesStore(state => state.enterIsNewline);
+  const composerQuickButton = useUIPreferencesStore(state => state.composerQuickButton);
   const chatMicTimeoutMs = useChatMicTimeoutMsValue();
   const { assistantAbortible, systemPurposeId, tokenCount: _historyTokenCount, abortConversationTemp } = useChatStore(useShallow(state => {
     const conversation = state.conversations.find(_c => _c.id === props.targetConversationId);
@@ -667,7 +668,7 @@ export function Composer(props: {
   const isDraw = chatExecuteMode === 'generate-image';
 
   const showChatInReferenceTo = !!inReferenceTo?.length;
-  const showChatExtras = isText && !showChatInReferenceTo;
+  const showChatExtras = isText && !showChatInReferenceTo && !assistantAbortible && composerQuickButton !== 'off';
 
   const sendButtonVariant: VariantProp = (isAppend || (isMobile && isTextBeam)) ? 'outlined' : 'solid';
 
@@ -689,6 +690,8 @@ export function Composer(props: {
   const beamButtonColor: ColorPaletteProp | undefined =
     !llmAttachmentDraftsCollection.canAttachAllFragments ? 'warning'
       : undefined;
+
+  const showTint: ColorPaletteProp | undefined = isDraw ? 'warning' : isReAct ? 'success' : undefined;
 
   // stable randomization of the /verb, between '/draw', '/react'
   const placeholderAction = React.useMemo(() => {
@@ -726,7 +729,12 @@ export function Composer(props: {
   }), [dragContainerSx]);
 
   return (
-    <Box aria-label='New Message' component='section' sx={props.sx}>
+    <Box
+      aria-label='New Message'
+      component='section'
+      bgcolor={showTint ? `var(--joy-palette-${showTint}-softBg)` : themeBgAppChatComposer}
+      sx={props.sx}
+    >
 
       {!isMobile && labsShowShortcutBar && <StatusBarMemo toggleMinimized={handleToggleMinimized} isMinimized={isMinimized} />}
 
@@ -749,13 +757,13 @@ export function Composer(props: {
               <Box sx={{ flexGrow: 0, display: 'grid', gap: 1, alignSelf: 'flex-start' }}>
 
                 {/* [mobile] Mic button */}
-                {recognitionState.isAvailable && <ButtonMicMemo variant={micVariant} color={micColor} errorMessage={recognitionState.errorMessage} onClick={handleToggleMic} />}
+                {recognitionState.isAvailable && <ButtonMicMemo variant={micVariant} color={micColor === 'danger' ? 'danger' : showTint || micColor} errorMessage={recognitionState.errorMessage} onClick={handleToggleMic} />}
 
                 {/* Responsive Camera OCR button */}
-                {showChatAttachments && <ButtonAttachCameraMemo isMobile onOpenCamera={openCamera} />}
+                {showChatAttachments && <ButtonAttachCameraMemo color={showTint} isMobile onOpenCamera={openCamera} />}
 
                 {/* [mobile] Attach file button (in draw with image mode)  */}
-                {showChatAttachments === 'only-images' && <ButtonAttachFilesMemo isMobile onAttachFiles={handleAttachFiles} fullWidth multiple />}
+                {showChatAttachments === 'only-images' && <ButtonAttachFilesMemo color={showTint} isMobile onAttachFiles={handleAttachFiles} fullWidth multiple />}
 
                 {/* [mobile] [+] button */}
                 {showChatAttachments === true && (
@@ -799,19 +807,19 @@ export function Composer(props: {
                 {/*</FormHelperText>*/}
 
                 {/* Responsive Open Files button */}
-                <ButtonAttachFilesMemo onAttachFiles={handleAttachFiles} fullWidth multiple />
+                <ButtonAttachFilesMemo color={showTint} onAttachFiles={handleAttachFiles} fullWidth multiple />
 
                 {/* Responsive Web button */}
-                {showChatAttachments !== 'only-images' && <ButtonAttachWebMemo disabled={!hasComposerBrowseCapability} onOpenWebInput={openWebInputDialog} />}
+                {showChatAttachments !== 'only-images' && <ButtonAttachWebMemo color={showTint} disabled={!hasComposerBrowseCapability} onOpenWebInput={openWebInputDialog} />}
 
                 {/* Responsive Paste button */}
-                {supportsClipboardRead() && showChatAttachments !== 'only-images' && <ButtonAttachClipboardMemo onAttachClipboard={attachAppendClipboardItems} />}
+                {supportsClipboardRead() && showChatAttachments !== 'only-images' && <ButtonAttachClipboardMemo color={showTint} onAttachClipboard={attachAppendClipboardItems} />}
 
                 {/* Responsive Screen Capture button */}
-                {labsAttachScreenCapture && supportsScreenCapture && <ButtonAttachScreenCaptureMemo onAttachScreenCapture={handleAttachScreenCapture} />}
+                {labsAttachScreenCapture && supportsScreenCapture && <ButtonAttachScreenCaptureMemo color={showTint} onAttachScreenCapture={handleAttachScreenCapture} />}
 
                 {/* Responsive Camera OCR button */}
-                {labsCameraDesktop && <ButtonAttachCameraMemo onOpenCamera={openCamera} />}
+                {labsCameraDesktop && <ButtonAttachCameraMemo color={showTint} onOpenCamera={openCamera} />}
 
               </Box>)}
 
@@ -871,7 +879,7 @@ export function Composer(props: {
                     }}
                     sx={{
                       height: '100%',
-                      backgroundColor: 'background.level1',
+                      backgroundColor: showTint ? undefined : 'background.level1',
                       '&:focus-within': { backgroundColor: 'background.popup', '.within-composer-focus': { backgroundColor: 'background.popup' } },
                       lineHeight: lineHeightTextareaMd,
                     }} />
@@ -984,7 +992,9 @@ export function Composer(props: {
 
                 {/* [mobile] bottom-corner secondary button */}
                 {isMobile && (showChatExtras
-                    ? <ButtonCallMemo isMobile disabled={noConversation || noLLM} onClick={handleCallClicked} />
+                    ? (composerQuickButton === 'call'
+                      ? <ButtonCallMemo isMobile disabled={noConversation || noLLM} onClick={handleCallClicked} />
+                      : <ButtonBeamMemo isMobile disabled={noConversation /*|| noLLM*/} color={beamButtonColor} hasContent={!!composeText} onClick={handleSendTextBeamClicked} />)
                     : isDraw
                       ? <ButtonOptionsDraw isMobile onClick={handleDrawOptionsClicked} sx={{ mr: { xs: 1, md: 2 } }} />
                       : <IconButton disabled sx={{ mr: { xs: 1, md: 2 } }} />

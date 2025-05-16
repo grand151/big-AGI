@@ -14,12 +14,21 @@ import { optimaOpenModels } from '~/common/layout/optima/useOptima';
 import { useIsMobile } from '~/common/components/useMatchMedia';
 
 import { SettingUIComplexity } from './SettingUIComplexity';
+import { SettingUIComposerQuickButton } from './SettingUIComposerQuickButton';
 import { SettingUIContentScaling } from './SettingUIContentScaling';
 
 
 // configuration
 const SHOW_MARKDOWN_DISABLE_SETTING = false;
 const SHOW_PURPOSE_FINDER = false;
+
+
+const OptionsPageSize = [
+  { value: 'narrow', label: <WidthNormalIcon sx={{ width: 25, height: 24, mt: -0.25 }} /> },
+  { value: 'wide', label: <WidthWideIcon sx={{ width: 25, height: 24, mt: -0.25 }} /> },
+  { value: 'full', label: 'Full' },
+] as const;
+
 
 function ModelsSetupButton() {
   return <Button
@@ -105,22 +114,20 @@ export function AppChatSettingsUI() {
               slotProps={{ endDecorator: { sx: { minWidth: 26 } } }} />
     </FormControl>}
 
-    <SettingUIComplexity />
-
     <SettingUIContentScaling />
 
     {!isPwa() && !isMobile && (
       <FormRadioControl
         title='Page Size'
         description={centerMode === 'full' ? 'Full screen chat' : centerMode === 'narrow' ? 'Narrow chat' : 'Wide'}
-        options={[
-          { value: 'narrow', label: <WidthNormalIcon sx={{ width: 25, height: 24, mt: -0.25 }} /> },
-          { value: 'wide', label: <WidthWideIcon sx={{ width: 25, height: 24, mt: -0.25 }} /> },
-          { value: 'full', label: 'Full' },
-        ]}
+        options={OptionsPageSize}
         value={centerMode} onChange={setCenterMode}
       />
     )}
 
+    <SettingUIComplexity />
+
+    {isMobile && <SettingUIComposerQuickButton />}
+
   </>;
-};
+}
