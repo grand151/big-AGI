@@ -130,7 +130,7 @@ function OptimaBarDropdown<TValue extends string>(props: {
   prependOption?: React.JSX.Element
   appendOption?: React.JSX.Element,
   placeholder?: string,
-  showSymbols?: boolean,
+  showSymbols?: boolean | 'compact',
   showGone?: boolean,
 }, ref: React.Ref<OptimaBarControlMethods>) {
 
@@ -189,6 +189,7 @@ function OptimaBarDropdown<TValue extends string>(props: {
           // Label & Decorators
           const safeTitle = _item.title || '';
           const label = (props.showSymbols && _item.symbol) ? `${_item.symbol} ${safeTitle}` : safeTitle;
+          const iconOrSymbol = _item.icon || _item.symbol || '';
 
           return _item.type === 'separator' ? (
             <ListDivider key={_itemKey || `sep-${idx}`}>
@@ -200,7 +201,9 @@ function OptimaBarDropdown<TValue extends string>(props: {
           ) : (
             <Option key={_itemKey} value={_itemKey} label={label}>
               {/* Icon / Symbol */}
-              {(props.showSymbols && _item.icon || _item.symbol !== undefined) && <ListItemDecorator>{_item.icon || _item.symbol || ''}</ListItemDecorator>}
+              {(props.showSymbols === true || (props.showSymbols === 'compact' && !!iconOrSymbol)) && <ListItemDecorator>
+                {iconOrSymbol}
+              </ListItemDecorator>}
 
               {/* Text */}
               <div className='agi-ellipsize'>{safeTitle}</div>

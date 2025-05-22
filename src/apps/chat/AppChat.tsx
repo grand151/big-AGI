@@ -34,7 +34,6 @@ import { gcChatImageAssets } from '~/common/stores/chat/chat.gc';
 import { getChatLLMId } from '~/common/stores/llms/store-llms';
 import { getConversation, getConversationSystemPurposeId, useConversation } from '~/common/stores/chat/store-chats';
 import { optimaActions, optimaOpenModels, optimaOpenPreferences } from '~/common/layout/optima/useOptima';
-import { themeBgAppChatComposer } from '~/common/app.theme';
 import { useFolderStore } from '~/common/stores/folders/store-chat-folders';
 import { useIsMobile, useIsTallScreen } from '~/common/components/useMatchMedia';
 import { useLLM } from '~/common/stores/llms/llms.hooks';
@@ -99,11 +98,23 @@ const composerOpenSx: SxProps = {
   // NOTE: disabled on 2025-03-05: conflicts with the GlobalDragOverlay's
   // zIndex: 21, // just to allocate a surface, and potentially have a shadow
   minWidth: { md: 480 }, // don't get compresses too much on desktop
-  backgroundColor: themeBgAppChatComposer,
+  // backgroundColor: themeBgAppChatComposer, // inlined in the Composer
+  transition: 'background-color 0.5s ease-out',
   borderTop: `1px solid`,
   borderTopColor: 'rgba(var(--joy-palette-neutral-mainChannel, 99 107 116) / 0.4)',
   // hack: eats the bottom of the last message (as it has a 1px divider)
-  mt: '-1px',
+  // NOTE: commented on 2024-05-13, as other content was stepping on the border due to it and missing zIndex
+  // mt: '-1px',
+};
+
+const composerOpenMobileSx: SxProps = {
+  zIndex: 21, // allocates the surface, possibly enables shadow if we like
+  // backgroundColor: themeBgAppChatComposer, // inlined in the Composer
+  transition: 'background-color 0.5s ease-out',
+  borderTop: `1px solid`,
+  borderTopColor: 'rgba(var(--joy-palette-neutral-mainChannel, 99 107 116) / 0.4)',
+  pt: 0.5, // have some breathing room
+  // boxShadow: '0px -1px 8px -2px rgba(0, 0, 0, 0.4)',
 };
 
 const composerClosedSx: SxProps = {
@@ -348,9 +359,10 @@ export function AppChat() {
       useFolderStore.getState().addConversationToFolder(activeFolderId, conversationId);
 
     // focus the composer
-    composerTextAreaRef.current?.focus();
+    if (!isMobile)
+      composerTextAreaRef.current?.focus();
 
-  }, [activeFolderId, focusedPaneConversationId, handleOpenConversationInFocusedPane, prependNewConversation, recycleNewConversationId]);
+  }, [activeFolderId, focusedPaneConversationId, handleOpenConversationInFocusedPane, isMobile, prependNewConversation, recycleNewConversationId]);
 
   const handleConversationImportDialog = React.useCallback(() => setTradeConfig({ dir: 'import' }), []);
 
@@ -746,7 +758,7 @@ export function AppChat() {
       onConversationsImportFromFiles={handleConversationsImportFromFiles}
       onTextImagine={handleImagineFromText}
       setIsMulticast={setIsComposerMulticast}
-      sx={beamOpenStoreInFocusedPane ? composerClosedSx : composerOpenSx}
+      sx={beamOpenStoreInFocusedPane ? composerClosedSx : isMobile ? composerOpenMobileSx : composerOpenSx}
     />
 
     {/* Diagrams */}

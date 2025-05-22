@@ -225,6 +225,11 @@ export function ChatMessage(props: {
   const couldImagine = textSubject.length >= 3 && !isSpecialT2I;
   const couldSpeak = couldImagine;
 
+  const userCommandApprox = !fromUser ? false
+    : fragmentFlattenedText.startsWith('/draw ') ? 'draw'
+      : fragmentFlattenedText.startsWith('/react ') ? 'react'
+        : false;
+
 
   // TODO: fix the diffing
   // const wordsDiff = useWordsDifference(textSubject, props.diffPreviousText, showDiff);
@@ -563,7 +568,7 @@ export function ChatMessage(props: {
 
 
   // style
-  const backgroundColor = messageBackground(messageRole, messageHasBeenEdited, false /*isAssistantError && !errorMessage*/);
+  const backgroundColor = messageBackground(messageRole, userCommandApprox, messageHasBeenEdited, false /*isAssistantError && !errorMessage*/);
 
   const listItemSx: SxProps = React.useMemo(() => ({
     // vars
@@ -576,7 +581,7 @@ export function ChatMessage(props: {
     // filter: 'url(#agi-futuristic-glow)',
 
     // style: omit border if set externally
-    ...(!('borderBottom' in (props.sx || {})) && {
+    ...(!('borderBottom' in (props.sx || {})) && !props.isBottom && {
       borderBottom: '1px solid',
       borderBottomColor: 'divider',
     }),
@@ -623,7 +628,7 @@ export function ChatMessage(props: {
     display: 'block', // this is Needed, otherwise there will be a horizontal overflow
 
     ...props.sx,
-  }), [adjContentScaling, backgroundColor, isEditingText, isUserMessageSkipped, isUserStarred, isVndAndCacheAuto, isVndAndCacheUser, props.sx, uiComplexityMode]);
+  }), [adjContentScaling, backgroundColor, isEditingText, isUserMessageSkipped, isUserStarred, isVndAndCacheAuto, isVndAndCacheUser, props.isBottom, props.sx, uiComplexityMode]);
 
 
   // avatar icon & label & tooltip
@@ -682,8 +687,8 @@ export function ChatMessage(props: {
               ) : (
                 <IconButton
                   size='sm'
-                  variant={opsMenuAnchor ? 'solid' : (zenMode && fromAssistant) ? 'plain' : 'soft'}
-                  color={(fromAssistant || fromSystem) ? 'neutral' : 'primary'}
+                  variant={opsMenuAnchor ? 'solid' : zenMode ? 'plain' : 'soft'}
+                  color={(fromAssistant || fromSystem || zenMode) ? 'neutral' : userCommandApprox === 'draw' ? 'warning' : userCommandApprox === 'react' ? 'success' : 'primary'}
                   sx={avatarIconSx}
                 >
                   <MoreVertIcon />

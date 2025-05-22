@@ -44,6 +44,9 @@ interface UIPreferencesStore {
   showPersonaFinder: boolean;
   setShowPersonaFinder: (showPersonaFinder: boolean) => void;
 
+  composerQuickButton: 'off' | 'call' | 'beam';
+  setComposerQuickButton: (composerQuickButton: 'off' | 'call' | 'beam') => void;
+
   // UI Dismissals
 
   dismissals: Record<string, boolean>;
@@ -96,6 +99,9 @@ export const useUIPreferencesStore = create<UIPreferencesStore>()(
       // Deprecated
       showPersonaFinder: false,
       setShowPersonaFinder: (showPersonaFinder: boolean) => set({ showPersonaFinder }),
+
+      composerQuickButton: 'beam',
+      setComposerQuickButton: (composerQuickButton: 'off' | 'call' | 'beam') => set({ composerQuickButton }),
 
       // UI Dismissals
 
@@ -183,6 +189,7 @@ type KnownKeys =
   | 'composer-shift-enter'            // not used Shift + Enter in the Composer yet
   | 'composer-alt-enter'              // not used Alt + Enter in the Composer yet
   | 'composer-ctrl-enter'             // not used Ctrl + Enter in the Composer yet
+  | 'models-setup-first-visit'        // first visit to the Models Setup
   ;
 
 export function useUICounter(key: KnownKeys, novelty: number = 1) {
