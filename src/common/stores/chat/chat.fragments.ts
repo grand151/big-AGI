@@ -572,15 +572,19 @@ export function filterDocAttachmentFragments(fragments: DMessageAttachmentFragme
  * Updates a fragment with the edited text, ensuring the fragment retains its type and structure.
  * @returns A new fragment with the edited text applied or null if the fragment type isn't handled.
  */
+export function updateFragmentWithEditedText(fragment: DMessageContentFragment, editedText: string): DMessageContentFragment | null;
+export function updateFragmentWithEditedText(fragment: DMessageAttachmentFragment, editedText: string): DMessageAttachmentFragment | null;
+export function updateFragmentWithEditedText(fragment: DMessageFragment, editedText: string): DMessageFragment | null;
 export function updateFragmentWithEditedText(
   fragment: DMessageFragment,
   editedText: string,
 ): DMessageFragment | null {
 
-  if (editedText.length === 0) {
-    // If the edited text is empty, we may choose to delete the fragment (depending on the caller's logic)
-    return null;
-  }
+  // NOTE: we transfer the responsibility of this to the caller
+  // if (editedText.length === 0) {
+  //   // If the edited text is empty, we may choose to delete the fragment (depending on the caller's logic)
+  //   return null;
+  // }
 
   if (isContentFragment(fragment)) {
     const { fId, part } = fragment;

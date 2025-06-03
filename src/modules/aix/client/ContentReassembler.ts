@@ -3,6 +3,7 @@ import { addDBImageAsset } from '~/modules/dblobs/dblobs.images';
 import type { MaybePromise } from '~/common/types/useful.types';
 import { DEFAULT_ADRAFT_IMAGE_MIMETYPE } from '~/common/attachment-drafts/attachment.pipeline';
 import { convertBase64Image, getImageDimensions } from '~/common/util/imageUtils';
+import { convert_Base64_To_UInt8Array } from '~/common/util/blobUtils';
 import { create_CodeExecutionInvocation_ContentFragment, create_CodeExecutionResponse_ContentFragment, create_FunctionCallInvocation_ContentFragment, createAnnotationsVoidFragment, createDMessageDataRefDBlob, createDVoidWebCitation, createErrorContentFragment, createImageContentFragment, createModelAuxVoidFragment, createTextContentFragment, DVoidModelAuxPart, isContentFragment, isModelAuxPart, isTextContentFragment, isVoidAnnotationsFragment, isVoidFragment } from '~/common/stores/chat/chat.fragments';
 import { ellipsizeMiddle } from '~/common/util/textUtils';
 import { metricsFinishChatGenerateLg, metricsPendChatGenerateLg } from '~/common/stores/metrics/metrics.chatgenerate';
@@ -222,6 +223,9 @@ export class ContentReassembler {
           case 'cer':
             this.onAddCodeExecutionResponse(op);
             break;
+          case 'ia':
+            await this.onAppendInlineAudio(op);
+            break;
           case 'ii':
             await this.onAppendInlineImage(op);
             break;
@@ -384,6 +388,88 @@ export class ContentReassembler {
   private onAddCodeExecutionResponse(cer: Extract<AixWire_Particles.PartParticleOp, { p: 'cer' }>): void {
     this.accumulator.fragments.push(create_CodeExecutionResponse_ContentFragment(cer.id, cer.error, cer.result, cer.executor, cer.environment));
     this.currentTextFragmentIndex = null;
+  }
+
+  private async onAppendInlineAudio(particle: Extract<AixWire_Particles.PartParticleOp, { p: 'ia' }>): Promise<void> {
+
+    // Break text accumulation, as we have a full audio part in the middle
+    this.currentTextFragmentIndex = null;
+
+    const { mimeType, a_b64: base64Data, label, generator, durationMs } = particle;
+    const safeLabel = label || 'Generated Audio';
+
+    try {
+
+      // create blob and play audio - this will throw on malformed data
+      const bytes = convert_Base64_To_UInt8Array(base64Data, 'ContentReassembler.onAppendInlineAudio');
+      const audioBlob = new Blob([bytes], { type: mimeType });
+      const audioUrl = URL.createObjectURL(audioBlob);
+
+      // Play the audio
+      const audio = new Audio(audioUrl);
+
+      // Clean up when audio ends or errors
+      const cleanup = () => {
+        URL.revokeObjectURL(audioUrl);
+        audio.removeEventListener('ended', cleanup);
+        audio.removeEventListener('error', cleanup);
+        audio.src = ''; // Release audio element reference
+      };
+      audio.addEventListener('ended', cleanup);
+      audio.addEventListener('error', cleanup);
+
+      // Play and handle immediate errors
+      audio.play().catch(error => {
+        console.warn('[Audio] Failed to play generated audio:', error);
+        cleanup();
+      });
+
+      // TEMP: show a label instead of adding the model part
+      this.accumulator.fragments.push(createTextContentFragment(`Playing ${safeLabel}${durationMs ? ` (${Math.round(durationMs / 10) / 100}s)` : ''}`));
+
+      // Add the audio to the DBlobs DB
+      // const dblobAssetId = await addDBAudioAsset('global', 'app-chat', {
+      //   label: safeLabel,
+      //   data: {
+      //     mimeType: mimeType as any,
+      //     base64: base64Data,
+      //   },
+      //   origin: {
+      //     ot: 'generated',
+      //     source: 'ai-text-to-speech',
+      //     generatorName: generator ?? '',
+      //     prompt: '', // Audio doesn't have a prompt in this context
+      //     parameters: {},
+      //     generatedAt: new Date().toISOString(),
+      //   },
+      //   metadata: {
+      //     durationMs: durationMs || 0,
+      //     // Other audio metadata could be added here
+      //   },
+      // });
+
+      // Create DMessage data reference for the audio
+      // const bytesSizeApprox = Math.ceil((base64Data.length * 3) / 4);
+      // const audioAssetDataRef = createDMessageDataRefDBlob(
+      //   dblobAssetId,
+      //   particle.mimeType,
+      //   bytesSizeApprox,
+      // );
+
+      // Create the DMessageContentFragment for audio
+      // const audioContentFragment = createAudioContentFragment(
+      //   audioAssetDataRef,
+      //   safeLabel,
+      //   durationMs,
+      // );
+
+      // this.accumulator.fragments.push(audioContentFragment);
+
+    } catch (error: any) {
+      console.warn('[DEV] Failed to add inline audio to DBlobs:', { label: safeLabel, error, mimeType, size: base64Data.length });
+      // Add an error fragment instead
+      this.accumulator.fragments.push(createErrorContentFragment(`Failed to process audio: ${error?.message || 'Unknown error'}`));
+    }
   }
 
   private async onAppendInlineImage(particle: Extract<AixWire_Particles.PartParticleOp, { p: 'ii' }>): Promise<void> {

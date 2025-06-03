@@ -98,17 +98,6 @@ export function asValidURL(textString: string | null, relaxProtocol: boolean = f
 }
 
 /**
- * Add https if missing, and remove trailing slash if present and the path starts with a slash.
- */
-export function fixupHost(host: string, apiPath: string): string {
-  if (!host.startsWith('http'))
-    host = `https://${host}`;
-  if (host.endsWith('/') && apiPath.startsWith('/'))
-    host = host.slice(0, -1);
-  return host;
-}
-
-/**
  * Extracts URLs from a text string.
  */
 export function extractUrlsFromText(text: string): string[] {
@@ -172,45 +161,3 @@ export function extractUrlsFromText(text: string): string[] {
 //     }
 //   }
 // }
-
-
-/**
- * Creates a Blob Object URL (that can be opened in a new tab with window.open, for instance)
- */
-export function createBlobURLFromData(base64Data: string, mimeType: string) {
-  const byteArray = base64ToUint8Array(base64Data);
-  const blob = new Blob([byteArray], { type: mimeType });
-  return URL.createObjectURL(blob);
-}
-
-export function base64ToUint8Array(base64Data: string) {
-  const binaryString = atob(base64Data);
-  return Uint8Array.from(binaryString, char => char.charCodeAt(0));
-}
-
-export function base64ToArrayBuffer(base64Data: string) {
-  return base64ToUint8Array(base64Data).buffer;
-}
-
-export function base64ToBlob(base64Data: string, mimeType: string) {
-  const buffer = Buffer.from(base64Data, 'base64');
-  return new Blob([buffer], { type: mimeType });
-}
-
-
-/**
- * Creates a Blob Object URL (that can be opened in a new tab with window.open, for instance) from a Data URL
- */
-export function createBlobURLFromDataURL(dataURL: string) {
-  if (!dataURL.startsWith('data:')) {
-    console.error('createBlobURLFromDataURL: Invalid data URL', dataURL);
-    return null;
-  }
-  const mimeType = dataURL.slice(5, dataURL.indexOf(';'));
-  const base64Data = dataURL.slice(dataURL.indexOf(',') + 1);
-  if (!mimeType || !base64Data) {
-    console.error('createBlobURLFromDataURL: Invalid data URL', dataURL);
-    return null;
-  }
-  return createBlobURLFromData(base64Data, mimeType);
-}

@@ -3,6 +3,7 @@ import { addDBImageAsset } from '~/modules/dblobs/dblobs.images';
 import { deleteDBAsset, gcDBAssetsByScope, transferDBAssetContextScope } from '~/modules/dblobs/dblobs.db';
 
 import { convertBase64Image, getImageDimensions, LLMImageResizeMode, resizeBase64ImageIfNeeded } from '~/common/util/imageUtils';
+import { convert_Blob_To_Base64 } from '~/common/util/blobUtils';
 import { createDMessageDataRefDBlob, createImageAttachmentFragment, DMessageAttachmentFragment, isImageRefPart } from '~/common/stores/chat/chat.fragments';
 
 import type { AttachmentDraftSource } from './attachment.types';
@@ -14,7 +15,7 @@ import { DEFAULT_ADRAFT_IMAGE_MIMETYPE, DEFAULT_ADRAFT_IMAGE_QUALITY } from './a
  */
 export async function imageDataToImageAttachmentFragmentViaDBlob(
   mimeType: string,
-  inputData: string | ArrayBuffer | unknown,
+  inputData: string | Blob | unknown,
   source: AttachmentDraftSource,
   title: string,
   caption: string,
@@ -24,14 +25,13 @@ export async function imageDataToImageAttachmentFragmentViaDBlob(
   let base64Data: string;
   let inputLength: number;
 
-  if (inputData instanceof ArrayBuffer) {
-    // Convert ArrayBuffer to base64
+  if (inputData instanceof Blob) {
+    // Convert Blob to base64
     try {
-      const buffer = Buffer.from(inputData);
-      base64Data = buffer.toString('base64');
-      inputLength = buffer.byteLength;
+      base64Data = await convert_Blob_To_Base64(inputData, 'image-attachment');
+      inputLength = inputData.size;
     } catch (error) {
-      console.log('imageAttachment: Error converting ArrayBuffer to base64:', error);
+      console.warn(`[DEV] imageAttachment: Error converting Blob to base64:`, { error });
       return null;
     }
   } else if (typeof inputData === 'string') {
@@ -93,7 +93,14 @@ export async function imageDataToImageAttachmentFragmentViaDBlob(
     const imageAssetDataRef = createDMessageDataRefDBlob(dblobAssetId, mimeType, inputLength);
 
     // return an Image Attachment Fragment
-    return createImageAttachmentFragment(title, caption, imageAssetDataRef, undefined, dimensions?.width, dimensions?.height);
+    return createImageAttachmentFragment(
+      title,
+      caption,
+      imageAssetDataRef,
+      undefined,
+      dimensions?.width,
+      dimensions?.height,
+    );
   } catch (error) {
     console.error('imageAttachment: Error processing image:', error);
     return null;

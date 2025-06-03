@@ -61,6 +61,10 @@ export namespace OpenAIWire_ContentParts {
     return { type: 'image_url', image_url: { url, detail } };
   }
 
+  export function OpenAI_AudioContentPart(data: string, format: 'wav' | 'mp3'): z.infer<typeof OpenAI_AudioContentPart_schema> {
+    return { type: 'input_audio', input_audio: { data, format } };
+  }
+
   /// Content parts - Output
 
   const PredictedFunctionCall_schema = z.object({
@@ -390,7 +394,8 @@ export namespace OpenAIWire_API_Chat_Completions {
     prompt_tokens_details: z.object({
       audio_tokens: z.number().optional(),
       cached_tokens: z.number().optional(),
-    }).optional(),
+    }).optional()
+      .nullable(), // [2025-06-02] Chutes.ai using slang server returns null for prompt_tokens_details
 
     // [OpenAI o1, 2024-09-12] breaks down the completion tokens into components
     completion_tokens_details: z.object({
@@ -399,7 +404,8 @@ export namespace OpenAIWire_API_Chat_Completions {
       audio_tokens: z.number().optional(), // [OpenAI, 2024-10-01] audio tokens used in the completion (charged at a different rate)
       accepted_prediction_tokens: z.number().optional(), // [OpenAI, 2024-11-05] Predicted Outputs
       rejected_prediction_tokens: z.number().optional(), // [OpenAI, 2024-11-05] Predicted Outputs
-    }).optional(), // not present in other APIs yet
+    }).optional() // not present in other APIs yet
+      .nullable(), // [2025-06-02] no issues yet, but preventive
 
     // [DeepSeek, 2024-08-02] context caching on disk
     prompt_cache_hit_tokens: z.number().optional(),
