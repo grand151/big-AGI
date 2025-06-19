@@ -14,9 +14,8 @@ export const Release = {
   TenantSlug: 'open',
 
   App: {
-    versionCode: '2.0.0-open-rc2',       // 1.92.0 sequentially...
+    versionCode: '2.0.0-open-rc3',       // 1.92.0 sequentially...
     versionName: 'Big-AGI 2',
-    releaseNotes: '',
   },
 
   // Future compatibility
@@ -61,4 +60,10 @@ export const Release = {
 
   IsNodeDevBuild: process.env.NODE_ENV === 'development',
 
+} as const;
+
+
+export const BaseProduct = {
+  ReleaseNotes: '',
+  SupportForm: (_userId?: string) => 'https://github.com/enricoros/big-agi/issues',
 } as const;

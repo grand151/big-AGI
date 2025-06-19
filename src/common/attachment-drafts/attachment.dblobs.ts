@@ -1,105 +1,81 @@
-import type { DBlobDBContextId, DBlobDBScopeId } from '~/modules/dblobs/dblobs.types';
-import { addDBImageAsset } from '~/modules/dblobs/dblobs.images';
-import { deleteDBAsset, gcDBAssetsByScope, transferDBAssetContextScope } from '~/modules/dblobs/dblobs.db';
+import { addDBImageAsset, DBlobDBContextId, DBlobDBScopeId, deleteDBAsset, gcDBAssetsByScope, transferDBAssetContextScope } from '~/common/stores/blob/dblobs-portability';
 
-import { convertBase64Image, getImageDimensions, LLMImageResizeMode, resizeBase64ImageIfNeeded } from '~/common/util/imageUtils';
-import { convert_Blob_To_Base64 } from '~/common/util/blobUtils';
+import { CommonImageMimeTypes, imageBlobTransform, LLMImageResizeMode } from '~/common/util/imageUtils';
+import { convert_Base64WithMimeType_To_Blob } from '~/common/util/blobUtils';
 import { createDMessageDataRefDBlob, createImageAttachmentFragment, DMessageAttachmentFragment, isImageRefPart } from '~/common/stores/chat/chat.fragments';
 
 import type { AttachmentDraftSource } from './attachment.types';
-import { DEFAULT_ADRAFT_IMAGE_MIMETYPE, DEFAULT_ADRAFT_IMAGE_QUALITY } from './attachment.pipeline';
 
 
 /**
  * Converts an image input to a DBlob and return a DMessageAttachmentFragment
  */
 export async function imageDataToImageAttachmentFragmentViaDBlob(
-  mimeType: string,
+  inputMime: string,
   inputData: string | Blob | unknown,
   source: AttachmentDraftSource,
   title: string,
   caption: string,
-  convertToMimeType: false | string,
+  convertToMimeType: false | CommonImageMimeTypes,
   resizeMode: false | LLMImageResizeMode,
 ): Promise<DMessageAttachmentFragment | null> {
-  let base64Data: string;
-  let inputLength: number;
 
+  // convert to Blobs if needed
+  let inputImage: Blob;
   if (inputData instanceof Blob) {
-    // Convert Blob to base64
+    inputImage = inputData;
+  } else if (typeof inputData === 'string') {
     try {
-      base64Data = await convert_Blob_To_Base64(inputData, 'image-attachment');
-      inputLength = inputData.size;
-    } catch (error) {
-      console.warn(`[DEV] imageAttachment: Error converting Blob to base64:`, { error });
+      inputImage = await convert_Base64WithMimeType_To_Blob(inputData, inputMime, 'image-attachment');
+    } catch (conversionError) {
+      console.warn(`[DEV] imageAttachment: Error converting string to Blob:`, { conversionError });
       return null;
     }
-  } else if (typeof inputData === 'string') {
-    // Assume data is already base64 encoded
-    base64Data = inputData;
-    inputLength = inputData.length;
   } else {
     console.log('imageAttachment: Invalid input data type:', typeof inputData);
     return null;
   }
 
   try {
-    // Resize image if requested
-    if (resizeMode) {
-      convertToMimeType = convertToMimeType || DEFAULT_ADRAFT_IMAGE_MIMETYPE;
-      const resizedData = await resizeBase64ImageIfNeeded(mimeType, base64Data, resizeMode, convertToMimeType || DEFAULT_ADRAFT_IMAGE_MIMETYPE, DEFAULT_ADRAFT_IMAGE_QUALITY).catch(() => null);
-      if (resizedData) {
-        base64Data = resizedData.base64;
-        mimeType = resizedData.mimeType;
-        inputLength = base64Data.length;
-      }
-    }
 
-    // Convert to default image mimetype if requested
-    if (convertToMimeType && mimeType !== convertToMimeType) {
-      const convertedData = await convertBase64Image(`data:${mimeType};base64,${base64Data}`, convertToMimeType, DEFAULT_ADRAFT_IMAGE_QUALITY).catch(() => null);
-      if (convertedData) {
-        base64Data = convertedData.base64;
-        mimeType = convertedData.mimeType;
-        inputLength = base64Data.length;
-      }
-    }
+    // perform resize/type conversion if desired, and find the image dimensions
+    const { blob: imageBlob, height: imageHeight, width: imageWidth } = await imageBlobTransform(inputImage, {
+      resizeMode: resizeMode || undefined,
+      convertToMimeType: convertToMimeType || undefined,
+      convertToLossyQuality: undefined, // use default
+      throwOnResizeError: true,
+      throwOnTypeConversionError: true,
+    });
 
-    // find out the dimensions (frontend)
-    const dimensions = await getImageDimensions(`data:${mimeType};base64,${base64Data}`).catch(() => null);
-
-    // add the image to the DB
-    const dblobAssetId = await addDBImageAsset('global', 'attachment-drafts', {
+    // add the image to the DBlobs DB
+    const dblobAssetId = await addDBImageAsset('attachment-drafts', imageBlob, {
       label: title ? 'Image: ' + title : 'Image',
-      data: {
-        mimeType: mimeType as any, /* we assume the mime is supported */
-        base64: base64Data,
+      metadata: {
+        width: imageWidth,
+        height: imageHeight,
+        // description: '',
       },
-      origin: {
+      origin: { // User originated
         ot: 'user',
         source: 'attachment',
         media: source.media === 'file' ? source.origin : source.media === 'url' ? 'url' : 'unknown',
         url: source.media === 'url' ? source.url : undefined,
         fileName: source.media === 'file' ? source.refPath : undefined,
       },
-      metadata: {
-        width: dimensions?.width || 0,
-        height: dimensions?.height || 0,
-        // description: '',
-      },
     });
 
-    // create a data reference for the image
-    const imageAssetDataRef = createDMessageDataRefDBlob(dblobAssetId, mimeType, inputLength);
-
-    // return an Image Attachment Fragment
+    // return an Image _Attachment_ Fragment
     return createImageAttachmentFragment(
       title,
       caption,
-      imageAssetDataRef,
+      createDMessageDataRefDBlob( // Data Reference {} for the image
+        dblobAssetId,
+        imageBlob.type,
+        imageBlob.size,
+      ),
       undefined,
-      dimensions?.width,
-      dimensions?.height,
+      imageWidth || undefined,
+      imageHeight || undefined,
     );
   } catch (error) {
     console.error('imageAttachment: Error processing image:', error);
