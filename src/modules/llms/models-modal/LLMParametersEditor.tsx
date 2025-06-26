@@ -22,12 +22,22 @@ const _reasoningEffortOptions = [
   { value: _UNSPECIFIED, label: 'Default', description: 'Default value (unset)' } as const,
 ] as const;
 const _webSearchContextOptions = [
-  { value: 'high', label: 'High', description: 'Largest, highest cost, slower' } as const,
+  { value: 'high', label: 'Comprehensive', description: 'Largest, highest cost, slower' } as const,
   { value: 'medium', label: 'Medium', description: 'Balanced context, cost, and speed' } as const,
   { value: 'low', label: 'Low', description: 'Smallest, cheapest, fastest' } as const,
   { value: _UNSPECIFIED, label: 'Default', description: 'Default value (unset)' } as const,
 ] as const;
-
+const _perplexitySearchModeOptions = [
+  { value: _UNSPECIFIED, label: 'Default', description: 'General web sources' },
+  { value: 'academic', label: 'Academic', description: 'Scholarly and peer-reviewed sources' },
+] as const;
+const _perplexityDateFilterOptions = [
+  { value: _UNSPECIFIED, label: 'All Time', description: 'No date restriction' },
+  { value: '1m', label: 'Last Month', description: 'Results from last 30 days' },
+  { value: '3m', label: 'Last 3 Months', description: 'Results from last 90 days' },
+  { value: '6m', label: 'Last 6 Months', description: 'Results from last 6 months' },
+  { value: '1y', label: 'Last Year', description: 'Results from last 12 months' },
+] as const;
 
 export function LLMParametersEditor(props: {
   // constants
@@ -70,6 +80,8 @@ export function LLMParametersEditor(props: {
     llmVndOaiRestoreMarkdown,
     llmVndOaiWebSearchContext,
     llmVndOaiWebSearchGeolocation,
+    llmVndPerplexityDateFilter,
+    llmVndPerplexitySearchMode,
   } = allParameters;
 
 
@@ -102,7 +114,7 @@ export function LLMParametersEditor(props: {
   const antThinkingOff = llmVndAntThinkingBudget === null;
   const gemThinkingAuto = llmVndGeminiThinkingBudget === undefined;
   const gemThinkingOff = llmVndGeminiThinkingBudget === 0;
-  
+
   // Get the range override if available for Gemini thinking budget
   const gemTBSpec = modelParamSpec['llmVndGeminiThinkingBudget'];
   const gemTBMinMax = gemTBSpec?.rangeOverride || defGemTB.range;
@@ -217,40 +229,25 @@ export function LLMParametersEditor(props: {
       />
     )}
 
-    {showParam('llmVndOaiReasoningEffort') && (
+    {showParam('llmVndPerplexitySearchMode') && (
       <FormSelectControl
-        title='Reasoning Effort'
-        tooltip='Controls how much effort the model spends on reasoning'
-        value={llmVndOaiReasoningEffort ?? _UNSPECIFIED}
+        title='Search Mode'
+        tooltip='Type of sources to prioritize in search results'
+        value={llmVndPerplexitySearchMode ?? _UNSPECIFIED}
         onChange={(value) => {
           if (value === _UNSPECIFIED || !value)
-            onRemoveParameter('llmVndOaiReasoningEffort');
+            onRemoveParameter('llmVndPerplexitySearchMode');
           else
-            onChangeParameter({ llmVndOaiReasoningEffort: value });
+            onChangeParameter({ llmVndPerplexitySearchMode: value });
         }}
-        options={_reasoningEffortOptions}
-      />
-    )}
-
-    {showParam('llmVndOaiRestoreMarkdown') && (
-      <FormSwitchControl
-        title='Restore Markdown'
-        description='Enable markdown formatting'
-        tooltip='o1 and o3 models in the API will avoid generating responses with markdown formatting. This option signals to the model to re-enable markdown formatting in the respons'
-        checked={!!llmVndOaiRestoreMarkdown}
-        onChange={checked => {
-          if (!checked)
-            onChangeParameter({ llmVndOaiRestoreMarkdown: false });
-          else
-            onChangeParameter({ llmVndOaiRestoreMarkdown: true });
-        }}
+        options={_perplexitySearchModeOptions}
       />
     )}
 
     {showParam('llmVndOaiWebSearchContext') && (
       <FormSelectControl
-        title='Search Context Size'
-        tooltip='Controls how much context is retrieved from the web'
+        title='Search Size'
+        tooltip='Controls how much context is retrieved from the web (low = default for Perplexity, medium = default for OpenAI)'
         value={llmVndOaiWebSearchContext ?? _UNSPECIFIED}
         onChange={(value) => {
           if (value === _UNSPECIFIED || !value)
@@ -277,6 +274,51 @@ export function LLMParametersEditor(props: {
                 onChangeParameter({ llmVndOaiWebSearchGeolocation: true });
             });
           }
+        }}
+      />
+    )}
+
+    {showParam('llmVndPerplexityDateFilter') && (
+      <FormSelectControl
+        title='Date Range'
+        tooltip='Filter search results by publication date'
+        value={llmVndPerplexityDateFilter ?? _UNSPECIFIED}
+        onChange={(value) => {
+          if (value === _UNSPECIFIED || !value)
+            onRemoveParameter('llmVndPerplexityDateFilter');
+          else
+            onChangeParameter({ llmVndPerplexityDateFilter: value });
+        }}
+        options={_perplexityDateFilterOptions}
+      />
+    )}
+
+    {showParam('llmVndOaiReasoningEffort') && (
+      <FormSelectControl
+        title='Reasoning Effort'
+        tooltip='Controls how much effort the model spends on reasoning'
+        value={llmVndOaiReasoningEffort ?? _UNSPECIFIED}
+        onChange={(value) => {
+          if (value === _UNSPECIFIED || !value)
+            onRemoveParameter('llmVndOaiReasoningEffort');
+          else
+            onChangeParameter({ llmVndOaiReasoningEffort: value });
+        }}
+        options={_reasoningEffortOptions}
+      />
+    )}
+
+    {showParam('llmVndOaiRestoreMarkdown') && (
+      <FormSwitchControl
+        title='Restore Markdown'
+        description='Enable markdown formatting'
+        tooltip='o1 and o3 models in the API will avoid generating responses with markdown formatting. This option signals to the model to re-enable markdown formatting in the respons'
+        checked={!!llmVndOaiRestoreMarkdown}
+        onChange={checked => {
+          if (!checked)
+            onChangeParameter({ llmVndOaiRestoreMarkdown: false });
+          else
+            onChangeParameter({ llmVndOaiRestoreMarkdown: true });
         }}
       />
     )}

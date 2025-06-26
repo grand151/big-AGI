@@ -142,6 +142,26 @@ export const DModelParameterRegistry = {
     initialValue: false,
   } as const,
 
+  // Perplexity-specific parameters
+
+  // llmVndPerplexityReasoningEffort - we reuse the OpenAI reasoning effort parameter
+
+  llmVndPerplexityDateFilter: {
+    label: 'Date Range',
+    type: 'enum' as const,
+    description: 'Filter results by publication date',
+    values: ['unfiltered', '1m', '3m', '6m', '1y'] as const,
+    // requiredFallback: 'unfiltered',
+  } as const,
+
+  llmVndPerplexitySearchMode: {
+    label: 'Search Mode',
+    type: 'enum' as const,
+    description: 'Type of sources to search',
+    values: ['default', 'academic'] as const,
+    // requiredFallback: 'default', // or leave unset for "unspecified"
+  } as const,
+
 } as const;
 
 
@@ -152,7 +172,7 @@ export interface DModelParameterSpec<T extends DModelParameterId> {
   paramId: T;
   required?: boolean;
   hidden?: boolean;
-  initialValue?: number | string | null;
+  initialValue?: boolean | number | string | null;
   // upstreamDefault?: DModelParameterValue<T>;
   /**
    * (optional, rare) Special: [min, max] range override for this parameter.
