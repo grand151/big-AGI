@@ -14,7 +14,7 @@ import { ScrollToBottomButton } from '~/common/scroll-to-bottom/ScrollToBottomBu
 import { useChatLLMDropdown } from '../chat/components/layout-bar/useLLMDropdown';
 
 import { SystemPurposeId, SystemPurposes } from '../../data';
-import { elevenLabsSpeakText } from '~/modules/elevenlabs/elevenlabs.client';
+import { speakText, getPersonaVoiceId } from '~/modules/tts/tts.client';
 import { AixChatGenerateContent_DMessage, aixChatGenerateContent_DMessage_FromConversation } from '~/modules/aix/client/aix.client';
 import { useElevenLabsVoiceDropdown } from '~/modules/elevenlabs/useElevenLabsVoiceDropdown';
 
@@ -118,7 +118,7 @@ export function Telephone(props: {
   }));
   const persona = SystemPurposes[props.callIntent.personaId as SystemPurposeId] ?? undefined;
   const personaCallStarters = persona?.call?.starters ?? undefined;
-  const personaVoiceId = overridePersonaVoice ? undefined : (persona?.voices?.elevenLabs?.voiceId ?? undefined);
+  const personaVoiceId = overridePersonaVoice ? undefined : getPersonaVoiceId(persona?.voices);
   const personaSystemMessage = persona?.systemMessage ?? undefined;
 
   // hooks and speech
@@ -186,7 +186,7 @@ export function Telephone(props: {
     setCallMessages([createDMessageTextContent('assistant', firstMessage)]); // [state] set assistant:hello message
 
     // fire/forget
-    void elevenLabsSpeakText(firstMessage, personaVoiceId, true, true);
+    void speakText(firstMessage, personaVoiceId, true, true);
 
     return () => clearInterval(interval);
   }, [isConnected, personaCallStarters, personaVoiceId]);
@@ -268,7 +268,7 @@ export function Telephone(props: {
 
       // fire/forget
       if (status.outcome === 'success' && finalText?.length >= 1)
-        void elevenLabsSpeakText(finalText, personaVoiceId, true, true);
+        void speakText(finalText, personaVoiceId, true, true);
 
     }).catch((err: DOMException) => {
       if (err?.name !== 'AbortError') {
