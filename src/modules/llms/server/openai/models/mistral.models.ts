@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import * as z from 'zod/v4';
 
 import { LLM_IF_OAI_Chat, LLM_IF_OAI_Fn, LLM_IF_OAI_Reasoning, LLM_IF_OAI_Vision } from '~/common/stores/llms/llms.types';
 import { Release } from '~/common/app.release';
@@ -157,7 +157,7 @@ export function mistralModels(wireModels: unknown): ModelDescriptionSchema[] {
 
   // 1. Parse and filter the API response
   const mistralModels = wireMistralModelsListSchema.parse(wireModels)
-    .filter(m => !m.capabilities || !!m.capabilities.completion_chat); // removes: *-embed, *-moderation, *-ocr
+    .filter(m => !m.capabilities || m.capabilities.completion_chat); // removes: *-embed, *-moderation, *-ocr
 
 
   // 2. Auto-hide models based on alias groups
