@@ -47,6 +47,8 @@ export type DMessageRole = 'user' | 'assistant' | 'system';
 
 export interface DMessageMetadata {
   inReferenceTo?: DMetaReferenceItem[]; // text this was in reply to
+  entangled?: DMessageEntangled; // entangled messages info
+  // NOTE: if adding fields, manually update `duplicateDMessageMetadata`
 }
 
 /** A textual reference to a text snipped, by a certain role. */
@@ -55,6 +57,13 @@ export interface DMetaReferenceItem {
   mText: string;
   mRole: DMessageRole;
   // messageId?: string;
+}
+
+/** Entangled messages info for coordinated multi-chat operations. */
+export interface DMessageEntangled {
+  id: string;           // entanglement group ID
+  color: string;        // hex color for visual connection
+  count: number;        // total number of chats this was sent to
 }
 
 
@@ -169,8 +178,15 @@ export function duplicateDMessage(message: Readonly<DMessage>, skipVoid: boolean
 }
 
 export function duplicateDMessageMetadata(metadata: Readonly<DMessageMetadata>): DMessageMetadata {
-  // TODO: deep copy this?
-  return { ...metadata };
+  // NOTE: update this function when adding metadata fields
+  return {
+    ...(metadata.inReferenceTo ? {
+      inReferenceTo: metadata.inReferenceTo.map(refItem => ({ ...refItem })),
+    } : {}),
+    ...(metadata.entangled ? {
+      entangled: { ...metadata.entangled },
+    } : {}),
+  };
 }
 
 export function duplicateDMessageGenerator(generator: Readonly<DMessageGenerator>): DMessageGenerator {
@@ -198,7 +214,7 @@ export function duplicateDMessageGenerator(generator: Readonly<DMessageGenerator
 // helpers - status checks
 
 export function messageWasInterruptedAtStart(message: Pick<DMessage, 'generator' | 'fragments'>): boolean {
-  return message.generator?.tokenStopReason === 'client-abort' && message.fragments.length === 0;
+  return message.generator?.tokenStopReason === 'client-abort' && !message.fragments?.length;
 }
 
 // export function messageOnlyContainsPlaceholder(message: Pick<DMessage, 'fragments'>): boolean {

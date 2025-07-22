@@ -39,6 +39,21 @@ const _perplexityDateFilterOptions = [
   { value: '1y', label: 'Last Year', description: 'Results from last 12 months' },
 ] as const;
 
+const _xaiSearchModeOptions = [
+  { value: 'auto', label: 'Auto', description: 'Model decides (default)' },
+  { value: 'on', label: 'On', description: 'Always search active sources' },
+  { value: 'off', label: 'Off', description: 'Never perform a search' },
+] as const;
+
+const _xaiDateFilterOptions = [
+  { value: 'unfiltered', label: 'All Time', description: 'No date restriction' },
+  { value: '1d', label: 'Last Day', description: 'Results from last 24 hours' },
+  { value: '1w', label: 'Last Week', description: 'Results from last 7 days' },
+  { value: '1m', label: 'Last Month', description: 'Results from last 30 days' },
+  { value: '6m', label: 'Last 6 Months', description: 'Results from last 6 months' },
+  { value: '1y', label: 'Last Year', description: 'Results from last 12 months' },
+] as const;
+
 export function LLMParametersEditor(props: {
   // constants
   maxOutputTokens: number | null,
@@ -82,6 +97,9 @@ export function LLMParametersEditor(props: {
     llmVndOaiWebSearchGeolocation,
     llmVndPerplexityDateFilter,
     llmVndPerplexitySearchMode,
+    llmVndXaiSearchMode,
+    llmVndXaiSearchSources,
+    llmVndXaiSearchDateFilter,
   } = allParameters;
 
 
@@ -335,6 +353,62 @@ export function LLMParametersEditor(props: {
           else
             onChangeParameter({ llmForceNoStream: true });
         }}
+      />
+    )}
+
+    {showParam('llmVndXaiSearchMode') && (
+      <FormSelectControl
+        title='Search Mode'
+        tooltip='Controls when to search'
+        value={llmVndXaiSearchMode ?? 'auto'}
+        onChange={value => onChangeParameter({ llmVndXaiSearchMode: value })}
+        options={_xaiSearchModeOptions}
+      />
+    )}
+
+    {showParam('llmVndXaiSearchSources') && (
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, ml: 0 }}>
+        {[
+          { key: 'web', label: 'Web Search', description: 'Search websites' },
+          { key: 'x', label: 'X Posts', description: 'Search X posts' },
+          { key: 'news', label: 'News', description: 'Search news' },
+        ].map(({ key, label, description }) => {
+          const currentSources = llmVndXaiSearchSources?.split(',').map(s => s.trim()).filter(Boolean) || [];
+          const isEnabled = currentSources.includes(key);
+          const searchIsOff = llmVndXaiSearchMode === 'off';
+
+          return (
+            <FormSwitchControl
+              key={key}
+              title={label}
+              description={description}
+              checked={isEnabled}
+              disabled={searchIsOff}
+              onChange={checked => {
+                const newSources = currentSources.filter(s => s !== key);
+                if (checked) newSources.push(key);
+                const newValue = newSources.length > 0 ? newSources.join(',') : undefined;
+                onChangeParameter({ llmVndXaiSearchSources: newValue || 'web,x' });
+              }}
+            />
+          );
+        })}
+      </Box>
+    )}
+
+    {showParam('llmVndXaiSearchDateFilter') && (
+      <FormSelectControl
+        title='Search Period'
+        // tooltip='Recency of search results'
+        disabled={llmVndXaiSearchMode === 'off'}
+        value={llmVndXaiSearchDateFilter ?? 'unfiltered'}
+        onChange={(value) => {
+          if (value === 'unfiltered' || !value)
+            onRemoveParameter('llmVndXaiSearchDateFilter');
+          else
+            onChangeParameter({ llmVndXaiSearchDateFilter: value });
+        }}
+        options={_xaiDateFilterOptions}
       />
     )}
 

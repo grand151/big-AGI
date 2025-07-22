@@ -120,6 +120,37 @@ export function aixToOpenAIChatCompletions(openAIDialect: OpenAIDialects, model:
       };
   }
 
+  // [xAI] Vendor-specific extensions for Live Search
+  if (openAIDialect === 'xai' && model.vndXaiSearchMode && model.vndXaiSearchMode !== 'off') {
+    const search_parameters: any = {
+      return_citations: true,
+    };
+
+    // mode defaults to 'auto' if not specified, so only include if not 'auto'
+    if (model.vndXaiSearchMode && model.vndXaiSearchMode !== 'auto')
+      search_parameters.mode = model.vndXaiSearchMode;
+
+    if (model.vndXaiSearchSources) {
+      const sources = model.vndXaiSearchSources
+        .split(',')
+        .map(s => s.trim())
+        .filter(s => !!s);
+      
+      // only omit sources if it's the default ('web' and 'x')
+      const isDefaultSources = sources.length === 2 && sources.includes('web') && sources.includes('x');
+      if (!isDefaultSources)
+        search_parameters.sources = sources.map(s => ({ type: s }));
+    }
+
+    if (model.vndXaiSearchDateFilter && model.vndXaiSearchDateFilter !== 'unfiltered') {
+      const fromDate = _convertSimpleDateFilterToISO(model.vndXaiSearchDateFilter);
+      if (fromDate)
+        search_parameters.from_date = fromDate;
+    }
+
+    payload.search_parameters = search_parameters;
+  }
+
   // [Perplexity] Vendor-specific extensions for search models
   if (openAIDialect === 'perplexity') {
     // Reasoning effort (reuses OpenAI parameter)
@@ -639,4 +670,26 @@ function _convertPerplexityDateFilter(filter: string): string {
       console.warn('[DEV] Perplexity date filter not recognized:', filter);
       return '';
   }
+}
+
+function _convertSimpleDateFilterToISO(filter: '1d' | '1w' | '1m' | '6m' | '1y'): string {
+  const now = new Date();
+  switch (filter) {
+    case '1d':
+      now.setDate(now.getDate() - 1);
+      break;
+    case '1w':
+      now.setDate(now.getDate() - 7);
+      break;
+    case '1m':
+      now.setMonth(now.getMonth() - 1);
+      break;
+    case '6m':
+      now.setMonth(now.getMonth() - 6);
+      break;
+    case '1y':
+      now.setFullYear(now.getFullYear() - 1);
+      break;
+  }
+  return now.toISOString().split('T')[0];
 }
