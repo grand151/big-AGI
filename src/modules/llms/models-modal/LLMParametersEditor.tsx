@@ -21,6 +21,13 @@ const _reasoningEffortOptions = [
   { value: 'low', label: 'Low', description: 'Quick, concise responses' } as const,
   { value: _UNSPECIFIED, label: 'Default', description: 'Default value (unset)' } as const,
 ] as const;
+const _reasoningEffort4Options = [
+  { value: 'high', label: 'High', description: 'Deep, thorough analysis' } as const,
+  { value: 'medium', label: 'Medium', description: 'Balanced reasoning depth' } as const,
+  { value: 'low', label: 'Low', description: 'Quick, concise responses' } as const,
+  { value: 'minimal', label: 'Minimal', description: 'Fastest, cheapest, least reasoning' } as const,
+  { value: _UNSPECIFIED, label: 'Default', description: 'Default value (unset)' } as const,
+] as const;
 const _webSearchContextOptions = [
   { value: 'high', label: 'Comprehensive', description: 'Largest, highest cost, slower' } as const,
   { value: 'medium', label: 'Medium', description: 'Balanced context, cost, and speed' } as const,
@@ -92,6 +99,7 @@ export function LLMParametersEditor(props: {
     llmVndGeminiShowThoughts,
     llmVndGeminiThinkingBudget,
     llmVndOaiReasoningEffort,
+    llmVndOaiReasoningEffort4,
     llmVndOaiRestoreMarkdown,
     llmVndOaiWebSearchContext,
     llmVndOaiWebSearchGeolocation,
@@ -136,6 +144,9 @@ export function LLMParametersEditor(props: {
   // Get the range override if available for Gemini thinking budget
   const gemTBSpec = modelParamSpec['llmVndGeminiThinkingBudget'];
   const gemTBMinMax = gemTBSpec?.rangeOverride || defGemTB.range;
+
+  // Check if web search should be disabled due to minimal reasoning effort
+  const isOaiReasoningEffortMinimal = llmVndOaiReasoningEffort4 === 'minimal';
 
   return <>
 
@@ -264,8 +275,9 @@ export function LLMParametersEditor(props: {
 
     {showParam('llmVndOaiWebSearchContext') && (
       <FormSelectControl
-        title='Search Size'
-        tooltip='Controls how much context is retrieved from the web (low = default for Perplexity, medium = default for OpenAI)'
+        title='Web Search'
+        tooltip={isOaiReasoningEffortMinimal ? 'Web search is not compatible with minimal reasoning effort' : 'Controls how much context is retrieved from the web (low = default for Perplexity, medium = default for OpenAI). For GPT-5 models, Default=OFF.'}
+        disabled={isOaiReasoningEffortMinimal}
         value={llmVndOaiWebSearchContext ?? _UNSPECIFIED}
         onChange={(value) => {
           if (value === _UNSPECIFIED || !value)
@@ -281,7 +293,8 @@ export function LLMParametersEditor(props: {
       <FormSwitchControl
         title='Add User Location'
         description='Use approximate location for better search results'
-        tooltip='When enabled, uses browser geolocation API to provide approximate location data to improve search results relevance'
+        tooltip={isOaiReasoningEffortMinimal ? 'Web search geolocation is not compatible with minimal reasoning effort' : 'When enabled, uses browser geolocation API to provide approximate location data to improve search results relevance'}
+        disabled={isOaiReasoningEffortMinimal}
         checked={!!llmVndOaiWebSearchGeolocation}
         onChange={checked => {
           if (!checked)
@@ -323,6 +336,21 @@ export function LLMParametersEditor(props: {
             onChangeParameter({ llmVndOaiReasoningEffort: value });
         }}
         options={_reasoningEffortOptions}
+      />
+    )}
+
+    {showParam('llmVndOaiReasoningEffort4') && (
+      <FormSelectControl
+        title='Reasoning Effort'
+        tooltip='Controls how much effort the model spends on reasoning (4-level scale)'
+        value={llmVndOaiReasoningEffort4 ?? _UNSPECIFIED}
+        onChange={(value) => {
+          if (value === _UNSPECIFIED || !value)
+            onRemoveParameter('llmVndOaiReasoningEffort4');
+          else
+            onChangeParameter({ llmVndOaiReasoningEffort4: value });
+        }}
+        options={_reasoningEffort4Options}
       />
     )}
 
