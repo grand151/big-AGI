@@ -28,11 +28,17 @@ const _reasoningEffort4Options = [
   { value: 'minimal', label: 'Minimal', description: 'Fastest, cheapest, least reasoning' } as const,
   { value: _UNSPECIFIED, label: 'Default', description: 'Default value (unset)' } as const,
 ] as const;
+const _verbosityOptions = [
+  { value: 'high', label: 'Detailed', description: 'Thorough responses, great for audits' } as const,
+  { value: 'medium', label: 'Balanced', description: 'Standard detail level (default)' } as const,
+  { value: 'low', label: 'Brief', description: 'Concise responses' } as const,
+  { value: _UNSPECIFIED, label: 'Default', description: 'Default value (unset)' } as const,
+] as const;
 const _webSearchContextOptions = [
   { value: 'high', label: 'Comprehensive', description: 'Largest, highest cost, slower' } as const,
   { value: 'medium', label: 'Medium', description: 'Balanced context, cost, and speed' } as const,
   { value: 'low', label: 'Low', description: 'Smallest, cheapest, fastest' } as const,
-  { value: _UNSPECIFIED, label: 'Default', description: 'Default value (unset)' } as const,
+  { value: _UNSPECIFIED, label: 'Off', description: 'Default (disabled)' } as const,
 ] as const;
 const _perplexitySearchModeOptions = [
   { value: _UNSPECIFIED, label: 'Default', description: 'General web sources' },
@@ -50,6 +56,14 @@ const _xaiSearchModeOptions = [
   { value: 'auto', label: 'Auto', description: 'Model decides (default)' },
   { value: 'on', label: 'On', description: 'Always search active sources' },
   { value: 'off', label: 'Off', description: 'Never perform a search' },
+] as const;
+
+const _imageGenerationOptions = [
+  { value: _UNSPECIFIED, label: 'Off', description: 'Default (disabled)' },
+  { value: 'mq', label: 'Standard', description: 'Quick gen' },
+  { value: 'hq', label: 'High Quality', description: 'Best looks' },
+  { value: 'hq_edit', label: 'Precise Edits', description: 'Controlled' },
+  // { value: 'hq_png', label: 'HD PNG', description: 'Uncompressed' }, // TODO: re-enable when uncompressed PNG saving is implemented
 ] as const;
 
 const _xaiDateFilterOptions = [
@@ -103,6 +117,8 @@ export function LLMParametersEditor(props: {
     llmVndOaiRestoreMarkdown,
     llmVndOaiWebSearchContext,
     llmVndOaiWebSearchGeolocation,
+    llmVndOaiImageGeneration,
+    llmVndOaiVerbosity,
     llmVndPerplexityDateFilter,
     llmVndPerplexitySearchMode,
     llmVndXaiSearchMode,
@@ -351,6 +367,36 @@ export function LLMParametersEditor(props: {
             onChangeParameter({ llmVndOaiReasoningEffort4: value });
         }}
         options={_reasoningEffort4Options}
+      />
+    )}
+
+    {showParam('llmVndOaiVerbosity') && (
+      <FormSelectControl
+        title='Verbosity'
+        tooltip='Controls response length and detail level'
+        value={llmVndOaiVerbosity ?? _UNSPECIFIED}
+        onChange={(value) => {
+          if (value === _UNSPECIFIED || !value)
+            onRemoveParameter('llmVndOaiVerbosity');
+          else
+            onChangeParameter({ llmVndOaiVerbosity: value });
+        }}
+        options={_verbosityOptions}
+      />
+    )}
+
+    {showParam('llmVndOaiImageGeneration') && (
+      <FormSelectControl
+        title='Image Generation'
+        tooltip='Configure image generation mode and quality'
+        value={llmVndOaiImageGeneration ?? _UNSPECIFIED}
+        onChange={(value) => {
+          if (value === _UNSPECIFIED || !value)
+            onRemoveParameter('llmVndOaiImageGeneration');
+          else
+            onChangeParameter({ llmVndOaiImageGeneration: value });
+        }}
+        options={_imageGenerationOptions}
       />
     )}
 
