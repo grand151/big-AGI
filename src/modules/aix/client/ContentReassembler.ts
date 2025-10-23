@@ -8,7 +8,6 @@ import { ellipsizeMiddle } from '~/common/util/textUtils';
 import { imageBlobTransform } from '~/common/util/imageUtils';
 import { metricsFinishChatGenerateLg, metricsPendChatGenerateLg } from '~/common/stores/metrics/metrics.chatgenerate';
 import { nanoidToUuidV4 } from '~/common/util/idUtils';
-import { presentErrorToHumans } from '~/common/util/errorUtils';
 
 import type { AixWire_Particles } from '../server/api/aix.wiretypes';
 
@@ -16,14 +15,14 @@ import type { AixClientDebugger, AixFrameId } from './debugger/memstore-aix-clie
 import { aixClientDebugger_completeFrame, aixClientDebugger_init, aixClientDebugger_recordParticleReceived, aixClientDebugger_setProfilerMeasurements, aixClientDebugger_setRequest } from './debugger/reassembler-debug';
 
 import { AixChatGenerateContent_LL, DEBUG_PARTICLES } from './aix.client';
+import { aixClassifyReassemblyError } from './aix.client.errors';
 
 
 // configuration
 const GENERATED_IMAGES_CONVERT_TO_COMPRESSED = true; // converts PNG to WebP or JPEG to save IndexedDB space
 const GENERATED_IMAGES_COMPRESSION_QUALITY = 0.98;
 const ELLIPSIZE_DEV_ISSUE_MESSAGES = 4096;
-const MERGE_ISSUES_INTO_TEXT_PART_IF_OPEN = true;
-const DEBUG_LOG_PROFILER_ON_CLIENT = false; // print Profiling particles when they come in, otherwise ignore them
+const MERGE_ISSUES_INTO_TEXT_PART_IF_OPEN = false; // 2025-10-10: put errors in the dedicated part
 
 
 /**
@@ -47,12 +46,12 @@ export class ContentReassembler {
   constructor(
     private readonly accumulator: AixChatGenerateContent_LL,
     private readonly onAccumulatorUpdated?: () => MaybePromise<void>,
-    enableDebugContext?: AixClientDebugger.Context,
+    inspectorContext?: AixClientDebugger.Context,
     private readonly wireAbortSignal?: AbortSignal,
   ) {
 
     // [SUDO] Debugging the request, last-write-wins for the global (displayed in the UI)
-    this.debuggerFrameId = !enableDebugContext ? null : aixClientDebugger_init(enableDebugContext);
+    this.debuggerFrameId = !inspectorContext ? null : aixClientDebugger_init(inspectorContext);
 
   }
 
@@ -96,7 +95,7 @@ export class ContentReassembler {
     if (DEBUG_PARTICLES)
       console.log('-> aix.p: abort-client');
 
-    // NOTE: this doens't go to the debugger anymore - as we only publish external particles to the debugger
+    // NOTE: this doesn't go to the debugger anymore - as we only publish external particles to the debugger
     await this.#reassembleParticle({ cg: 'end', reason: 'abort-client', tokenStopReason: 'client-abort-signal' });
   }
 
@@ -106,7 +105,7 @@ export class ContentReassembler {
 
     this.onCGIssue({ cg: 'issue', issueId: 'client-read', issueText: errorAsText });
 
-    // NOTE: this doens't go to the debugger anymore - as we only publish external particles to the debugger
+    // NOTE: this doesn't go to the debugger anymore - as we only publish external particles to the debugger
     await this.#reassembleParticle({ cg: 'end', reason: 'issue-rpc', tokenStopReason: 'cg-issue' });
   }
 
@@ -149,25 +148,17 @@ export class ContentReassembler {
 
     } catch (error) {
 
-      // ERROR CATCHING - LIKE the _aixChatGenerateContent_LL which doesn't intercept this somehow
-      // NEW METHOD: shows Error Fragments on both Reassembly and Callbacks errors
       //
-      // - we don't stop processing anymore, as the source may still be pumping particles
-      // - we insert an error fragment showing what happened - akin to how _aixChatGenerateContent_LL would do it
+      // Classify and display processing errors (particle/async work failures)
+      //
+      // NOTE: we cannot throw here as we are part of a detached promise chain
+      // READ the `aixClassifyReassemblyError` that explains this in detail
       //
       const showAsBold = !!this.accumulator.fragments.length;
-      const errorText = (presentErrorToHumans(error, showAsBold, true) || 'Unknown error');
-      this._appendReassemblyDevError(`An unexpected issue occurred: ${errorText} Please retry.`, true);
+      const { errorMessage } = aixClassifyReassemblyError(error, showAsBold);
+
+      this._appendReassemblyDevError(errorMessage, true);
       await this.onAccumulatorUpdated?.()?.catch(console.error);
-
-      // FORMER METHOD - the THROW wasn't caught by the caller
-
-      // mark that we've encountered an error to prevent further scheduling
-      // this.hadErrorInWireReassembly = true;
-      // this.wireParticlesBacklog.length = 0; // empty the backlog
-
-      // te-throw to propagate to outer catch blocks
-      // throw error;
 
     } finally {
 
@@ -258,13 +249,6 @@ export class ContentReassembler {
           case '_debugProfiler':
             if (this.debuggerFrameId)
               aixClientDebugger_setProfilerMeasurements(this.debuggerFrameId, op.measurements);
-            // Profiling particles will come in if the app is in "Debug Mode" + it's a Development build!
-            // Additionally to show them on the console (rather than just in the debugger) set the
-            // constant to `true`.
-            if (DEBUG_LOG_PROFILER_ON_CLIENT) {
-              console.warn('[AIX] chatGenerate profiler measurements:');
-              console.table(op.measurements);
-            }
             break;
           case 'end':
             this.onCGEnd(op);
@@ -277,6 +261,9 @@ export class ContentReassembler {
             break;
           case 'set-model':
             this.onModelName(op);
+            break;
+          case 'set-upstream-handle':
+            this.onResponseHandle(op);
             break;
           default:
             // noinspection JSUnusedLocalSymbols
@@ -433,7 +420,7 @@ export class ContentReassembler {
       });
 
       // TEMP: show a label instead of adding the model part
-      this.accumulator.fragments.push(createTextContentFragment(`Playing ${safeLabel}${durationMs ? ` (${Math.round(durationMs / 10) / 100}s)` : ''}`));
+      this.accumulator.fragments.push(createTextContentFragment(`Generated audio ▶ \`${safeLabel}\`${durationMs ? ` (${Math.round(durationMs / 10) / 100}s)` : ''}`));
 
       // Add the audio to the DBlobs DB
       // const dblobAssetId = await addDBAudioAsset('global', 'app-chat', {
@@ -532,7 +519,7 @@ export class ContentReassembler {
           ...(safeLabel ? { altText: safeLabel } : {}),
           ...(imageWidth ? { width: imageWidth } : {}),
           ...(imageHeight ? { height: imageHeight } : {}),
-        }
+        },
       );
 
       this.accumulator.fragments.push(zyncImageAssetFragmentWithLegacy);
@@ -626,6 +613,7 @@ export class ContentReassembler {
       // normal stop
       case 'ok':                    // content
       case 'ok-tool_invocations':   // content + tool invocation
+      case 'ok-pause_continue':     // [Anthropic] server tools (e.g. web search) - successful pause, requires continuation
         break;
 
       case 'client-abort-signal':
@@ -642,6 +630,7 @@ export class ContentReassembler {
 
       case 'filter-content':        // inline text message shall have been added
       case 'filter-recitation':     // inline text message shall have been added
+      case 'filter-refusal':        // [Anthropic] model refused due to safety (same semantic as filtering)
         this.accumulator.genTokenStopReason = 'filter';
         break;
 
@@ -661,7 +650,7 @@ export class ContentReassembler {
       const currentTextFragment = this.currentTextFragmentIndex === null ? null
         : this.accumulator.fragments[this.currentTextFragmentIndex];
       if (currentTextFragment && isTextContentFragment(currentTextFragment)) {
-        currentTextFragment.part.text += ' ' + issueText;
+        currentTextFragment.part.text += (currentTextFragment.part.text ? '\n' : ' ') + issueText;
         return;
       }
     }
@@ -677,6 +666,16 @@ export class ContentReassembler {
 
   private onModelName({ name }: Extract<AixWire_Particles.ChatGenerateOp, { cg: 'set-model' }>): void {
     this.accumulator.genModelName = name;
+  }
+
+  private onResponseHandle({ handle }: Extract<AixWire_Particles.ChatGenerateOp, { cg: 'set-upstream-handle' }>): void {
+    // validate the handle
+    if (handle?.uht !== 'vnd.oai.responses' || !handle?.responseId || handle?.expiresAt === undefined) {
+      this._appendReassemblyDevError(`Invalid response handle received: ${JSON.stringify(handle)}`);
+      return;
+    }
+    // type check point for AixWire_Particles.ChatControlOp('set-upstream-handle') -> DUpstreamResponseHandle
+    this.accumulator.genUpstreamHandle = handle;
   }
 
 
