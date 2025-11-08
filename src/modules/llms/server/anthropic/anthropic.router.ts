@@ -6,6 +6,7 @@ import { env } from '~/server/env';
 import { fetchJsonOrTRPCThrow } from '~/server/trpc/trpc.router.fetchers';
 
 import { LLM_IF_ANT_PromptCaching, LLM_IF_OAI_Chat, LLM_IF_OAI_Fn, LLM_IF_OAI_Vision, LLM_IF_Tools_WebSearch } from '~/common/stores/llms/llms.types';
+import { Release } from '~/common/app.release';
 
 import { ListModelsResponse_schema, ModelDescriptionSchema } from '../llm.server.types';
 
@@ -16,6 +17,8 @@ import { fixupHost } from '~/modules/llms/server/openai/openai.router';
 // configuration and defaults
 const DEFAULT_ANTHROPIC_HOST = 'api.anthropic.com';
 const DEFAULT_HELICONE_ANTHROPIC_HOST = 'anthropic.hconeai.com';
+
+const DEV_DEBUG_ANTHROPIC_MODELS = Release.IsNodeDevBuild;
 
 const DEFAULT_ANTHROPIC_HEADERS = {
   // Latest version hasn't changed (as of Feb 2025)
@@ -63,18 +66,6 @@ const PER_MODEL_BETA_FEATURES: { [modelId: string]: string[] } = {
 
     /** computer Tools for Sonnet 3.7 [computer_20250124, text_editor_20250124, bash_20250124] */
     'computer-use-2025-01-24',
-
-  ] as const,
-  'claude-3-5-sonnet-20241022': [
-
-    /** computer Tools for Sonnet 3.5 v2 [computer_20241022, text_editor_20241022, bash_20241022] */
-    'computer-use-2024-10-22',
-
-  ] as const,
-  'claude-3-5-sonnet-20240620': [
-
-    /** to use the 8192 tokens limit for the FIRST 3.5 Sonnet model */
-    'max-tokens-3-5-sonnet-2024-07-15',
 
   ] as const,
 } as const;
@@ -271,6 +262,7 @@ export const llmAnthropicRouter = createTRPCRouter({
 
             // for day-0 support of new models, create a placeholder model using sensible defaults
             const novelModel = _createPlaceholderModel(model);
+            // if (DEV_DEBUG_ANTHROPIC_MODELS) // kind of important...
             console.log('[DEV] anthropic.router: new model found, please configure it:', novelModel.id);
             acc.push(novelModel);
 
@@ -281,10 +273,13 @@ export const llmAnthropicRouter = createTRPCRouter({
         .map(_injectWebSearchInterface);
 
       // developers warning for obsoleted models (we have them, but they are not in the API response anymore)
-      const apiModelIds = new Set(availableModels.map(m => m.id));
-      const additionalModels = hardcodedAnthropicModels.filter(m => !apiModelIds.has(m.id));
-      if (additionalModels.length > 0)
-        console.log('[DEV] anthropic.router: obsoleted models:', additionalModels.map(m => m.id).join(', '));
+      if (DEV_DEBUG_ANTHROPIC_MODELS) {
+        const apiModelIds = new Set(availableModels.map(m => m.id));
+        const additionalModels = hardcodedAnthropicModels.filter(m => !apiModelIds.has(m.id));
+        if (additionalModels.length > 0)
+          console.log('[DEV] anthropic.router: obsoleted models:', additionalModels.map(m => m.id).join(', '));
+      }
+
       // additionalModels.forEach(m => {
       //   m.label += ' (Removed)';
       //   m.isLegacy = true;

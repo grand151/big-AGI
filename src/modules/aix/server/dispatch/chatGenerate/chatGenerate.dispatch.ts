@@ -13,7 +13,7 @@ import { aixToGeminiGenerateContent } from './adapters/gemini.generateContent';
 import { aixToOpenAIChatCompletions } from './adapters/openai.chatCompletions';
 import { aixToOpenAIResponses } from './adapters/openai.responsesCreate';
 
-import type { IParticleTransmitter } from './IParticleTransmitter';
+import type { IParticleTransmitter } from './parsers/IParticleTransmitter';
 import { createAnthropicMessageParser, createAnthropicMessageParserNS } from './parsers/anthropic.parser';
 import { createGeminiGenerateContentResponseParser } from './parsers/gemini.parser';
 import { createOpenAIChatCompletionsChunkParser, createOpenAIChatCompletionsParserNS } from './parsers/openai.parser';
@@ -32,7 +32,11 @@ export type ChatGenerateDispatchRequest =
   | { url: string, headers: HeadersInit, method: 'POST', body: object }
   | { url: string, headers: HeadersInit, method: 'GET' };
 
-export type ChatGenerateParseFunction = (partTransmitter: IParticleTransmitter, eventData: string, eventName?: string) => void;
+export type ChatGenerateParseContext = {
+  retriesAvailable: boolean;
+};
+
+export type ChatGenerateParseFunction = (partTransmitter: IParticleTransmitter, eventData: string, eventName?: string, context?: ChatGenerateParseContext) => void;
 
 
 // -- Specialized Implementations -- Core of Server-side AI Vendors abstraction --

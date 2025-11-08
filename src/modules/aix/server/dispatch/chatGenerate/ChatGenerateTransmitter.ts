@@ -3,7 +3,7 @@ import { serverSideId } from '~/server/trpc/trpc.nanoid';
 
 import type { AixWire_Particles } from '../../api/aix.wiretypes';
 
-import type { IParticleTransmitter } from './IParticleTransmitter';
+import type { IParticleTransmitter } from './parsers/IParticleTransmitter';
 
 
 // configuration
@@ -151,7 +151,7 @@ export class ChatGenerateTransmitter implements IParticleTransmitter {
     });
   }
 
-  addDebugProfilererData(measurements: Record<string, string | number>[]) {
+  addDebugProfilerData(measurements: Record<string, string | number>[]) {
     this.transmissionQueue.push({
       cg: '_debugProfiler',
       measurements,
@@ -318,8 +318,10 @@ export class ChatGenerateTransmitter implements IParticleTransmitter {
 
   /** Undocumented, internal, as the IPartTransmitter callers will call setDialectTerminatingIssue instead */
   private _addIssue(issueId: AixWire_Particles.CGIssueId, issueText: string, forceLogWarn: boolean) {
-    if (forceLogWarn || ENABLE_EXTRA_DEV_MESSAGES || SERVER_DEBUG_WIRE)
-      console.warn(`Aix.${this.prettyDialect} (${issueId}): ${issueText}`);
+    if (forceLogWarn || ENABLE_EXTRA_DEV_MESSAGES || SERVER_DEBUG_WIRE) {
+      const logLevel = issueId === 'dispatch-fetch' ? 'log' : 'warn';
+      console[logLevel](`Aix.${this.prettyDialect} ${issueId}: ${issueText}`);
+    }
 
     // queue the issue
     this.endMessagePart();
@@ -415,6 +417,14 @@ export class ChatGenerateTransmitter implements IParticleTransmitter {
       ...(textSnippet ? { text: textSnippet } : {}),
       ...(pubTs !== undefined ? { pubTs } : {}),
     } satisfies Extract<AixWire_Particles.PartParticleOp, { p: 'urlc' }>);
+  }
+
+
+  /** Sends control particles right away, such as retry-reset control particles */
+  sendControl(cgCOp: AixWire_Particles.ChatControlOp, flushQueue: boolean = true) {
+    // queue current particles before sending control particle (interfere with content flow)
+    if (flushQueue) this._queueParticleS();
+    this.transmissionQueue.push(cgCOp);
   }
 
   /** Sends a void placeholder particle - temporary status that gets wiped when real content arrives */

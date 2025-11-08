@@ -86,6 +86,7 @@ export const useModelsStore = create<LlmsStore>()(persist(
               ...(existing.userParameters !== undefined ? { userParameters: { ...existing.userParameters } } : {}),
               ...(existing.userContextTokens !== undefined ? { userContextTokens: existing.userContextTokens } : {}),
               ...(existing.userMaxOutputTokens !== undefined ? { userMaxOutputTokens: existing.userMaxOutputTokens } : {}),
+              ...(existing.userPricing !== undefined ? { userPricing: existing.userPricing } : {}),
             };
           });
         }
@@ -163,7 +164,7 @@ export const useModelsStore = create<LlmsStore>()(persist(
         llms: llms.map((llm: DLLM): DLLM => {
           if (llm.id !== id) return llm;
           // strip away just the user parameters
-          const { userParameters /*, userContextTokens, userMaxOutputTokens*/, ...rest } = llm;
+          const { userParameters /*, userContextTokens, userMaxOutputTokens, userPricing, ...*/, ...rest } = llm;
           return rest;
         }),
     })),

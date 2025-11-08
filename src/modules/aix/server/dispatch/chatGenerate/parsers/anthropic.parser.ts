@@ -2,10 +2,11 @@ import { safeErrorString } from '~/server/wire';
 
 import type { AixWire_Particles } from '../../../api/aix.wiretypes';
 import type { ChatGenerateParseFunction } from '../chatGenerate.dispatch';
-import type { IParticleTransmitter } from '../IParticleTransmitter';
+import type { IParticleTransmitter } from './IParticleTransmitter';
 import { IssueSymbols } from '../ChatGenerateTransmitter';
 
 import { AnthropicWire_API_Message_Create } from '../../wiretypes/anthropic.wiretypes';
+import { RequestRetryError } from '../chatGenerate.retrier';
 
 
 // configuration
@@ -61,7 +62,7 @@ export function createAnthropicMessageParser(): ChatGenerateParseFunction {
   let messageStartTime: number | undefined = undefined;
   let chatInTokens: number | undefined = undefined;
 
-  return function(pt: IParticleTransmitter, eventData: string, eventName?: string): void {
+  return function(pt: IParticleTransmitter, eventData: string, eventName?: string, context?: { retriesAvailable: boolean }): void {
 
     // Time to first event
     if (timeToFirstEvent === undefined)
@@ -503,6 +504,41 @@ export function createAnthropicMessageParser(): ChatGenerateParseFunction {
         const { error } = JSON.parse(eventData);
         const errorText = (error.type && error.message) ? `${error.type}: ${error.message}` : safeErrorString(error);
         if (ANTHROPIC_DEBUG_EVENT_SEQUENCE) console.log(`ant error: ${errorText}`);
+
+        // Errors documented by Anthropic - these follow a 200 HTTP response, so they're sent as JSON
+        // https://docs.claude.com/en/api/errors
+        //
+        // 400 - invalid_request_error (bad input)
+        // 401 - authentication_error (api key issue)
+        // 403 - permission_error (api key lacks permissions)
+        // 404 - not_found_error
+        // 413 - request_too_large (> 32MB for standard streaming)
+        // 429* - rate_limit_error (account hit limits)
+        // 500* - api_error (anthropic systems internal unexpected error)
+        // 529* - overloaded_error: The API is temporarily overloaded.
+        // *: retryable errors
+        const isRetryableError = ['overloaded_error', 'rate_limit_error', 'api_error'].includes(error.type);
+
+        // Throw retryable error to instruct the correct ancestor to restart (only if retries available
+        if (isRetryableError) {
+          if (context?.retriesAvailable) {
+            console.log(`[Aix.Anthropic] Can retry error '${errorText}'`);
+            // map error types to HTTP status codes for diagnostics
+            const errorTypeToHttpStatus: Record<string, number> = {
+              'rate_limit_error': 429,
+              'api_error': 500,
+              'overloaded_error': 529,
+            };
+            // request a retry by unwinding to the retrier
+            throw new RequestRetryError(`retrying Anthropic: ${errorText}`, {
+              causeHttp: errorTypeToHttpStatus[error.type],
+              causeConn: error.type,
+            });
+          } else
+            console.log(`[Aix.Anthropic] ⛔ No retries available for error '${errorText}'`);
+        }
+
+        // Non-retryable errors (or no retries left): show to user
         return pt.setDialectTerminatingIssue(errorText || 'unknown server issue.', IssueSymbols.Generic);
 
       default:
@@ -516,7 +552,7 @@ export function createAnthropicMessageParser(): ChatGenerateParseFunction {
 export function createAnthropicMessageParserNS(): ChatGenerateParseFunction {
   const parserCreationTimestamp = Date.now();
 
-  return function(pt: IParticleTransmitter, fullData: string): void {
+  return function(pt: IParticleTransmitter, fullData: string /*, eventName?: string, context?: { retriesAvailable: boolean } */): void {
 
     // parse with validation (e.g. type: 'message' && role: 'assistant')
     const {

@@ -7,6 +7,7 @@ import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
 import type { DModelsServiceId } from '~/common/stores/llms/llms.service.types';
 import { AlreadySet } from '~/common/components/AlreadySet';
 import { FormInputKey } from '~/common/components/forms/FormInputKey';
+import { getLLMPricing } from '~/common/stores/llms/llms.types';
 import { InlineError } from '~/common/components/InlineError';
 import { Link } from '~/common/components/Link';
 import { SetupFormRefetchButton } from '~/common/components/forms/SetupFormRefetchButton';
@@ -50,12 +51,11 @@ export function OpenRouterServiceSetup(props: { serviceId: DModelsServiceId }) {
   const handleRemoveNonFreeLLMs = () => {
     // A bit of a hack
     const { llms } = llmsStoreState();
-    const { removeLLM } = llmsStoreActions();
+    const { updateLLM } = llmsStoreActions();
     llms
       .filter(llm => llm.sId === props.serviceId)
-      .filter(llm => llm.pricing?.chat?._isFree === false)
-      // .forEach(llm => updateLLM(llm.id, { hidden: true }));
-      .forEach(llm => removeLLM(llm.id));
+      .filter(llm => getLLMPricing(llm)?.chat?._isFree === false)
+      .forEach(llm => updateLLM(llm.id, { userHidden: true }));
   };
 
   const handleSetVisibilityAll = React.useCallback((visible: boolean) => {
@@ -72,8 +72,7 @@ export function OpenRouterServiceSetup(props: { serviceId: DModelsServiceId }) {
 
     <Typography level='body-sm'>
       <Link href='https://openrouter.ai/keys' target='_blank'>OpenRouter</Link> is an independent service
-      granting access to <Link href='https://openrouter.ai/docs#models' target='_blank'>exclusive models</Link> such
-      as GPT-4 32k, Claude, and more. <Link
+      providing access to <Link href='https://openrouter.ai/docs#models' target='_blank'>a wide range of models</Link>. <Link
       href='https://github.com/enricoros/big-agi/blob/main/docs/config-openrouter.md' target='_blank'>
       Configuration &amp; documentation</Link>.
     </Typography>
